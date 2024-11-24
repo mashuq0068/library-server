@@ -1,5 +1,6 @@
 import { BorrowRecord } from "@prisma/client";
 import { prisma } from "../../config";
+import calculateOverdueDays from "../../utils/calculateOverdueDays";
 
 const borrowBook = async (payload: BorrowRecord) => {
   const result = await prisma.$transaction(async (tnx) => {
@@ -84,7 +85,37 @@ const returnBook = async (payload: Partial<BorrowRecord>) => {
 // };
 
 
+
+const getOverdueBorrowList = async () => {
+  const overdueBooks = await prisma.borrowRecord.findMany({
+    where: {
+      returnDate: null,
+      borrowDate: {
+        lte: new Date(new Date().setDate(new Date().getDate() - 14)), 
+      },
+    },
+    include: {
+      book: true, 
+      member: true, 
+    },
+  });
+
+  const result = overdueBooks.map((book) => {
+    const overdueDays = calculateOverdueDays(book.borrowDate);
+
+    return {
+      borrowId: book.borrowId,
+      bookTitle: book.book.title,  
+      borrowerName: book.member.name,  
+      overdueDays,
+    };
+  });
+
+  return result.length > 0 ? result : [];
+};
+
 export const borrowRecordServices = {
   borrowBook,
   returnBook,
+  getOverdueBorrowList
 };
